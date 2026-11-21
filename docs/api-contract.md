@@ -1,4 +1,4 @@
-# Argus CI API contract — v0.1 (canonical)
+# Argus CI API contract — v0.2 (canonical)
 
 > This is the **canonical, implementation-current** document. The lab copy
 > (`Argus-Agent-Test-Lab`, `docs/ci/api-contract-v0.md`) freezes the original
@@ -10,6 +10,10 @@ Status: **implemented — console live**. Verified end-to-end by the public
 dogfood (`igor-vii/argus-ci-dogfood`): the action fetches the sealed bundle,
 registers the run and the debit, and the console answers every edge the
 contract prescribes (402 on empty balance, 409 on replay, 401 without a key).
+
+v0.2 (2026-11-22) — the single-run SKU is **live** and the SKU table below is
+canonical: docs/monetary-only, a strict superset of v0.1. No endpoint, field
+or debit-semantics change; `charged_credits` stays 1 per logical run.
 
 v0.1 is a strict **superset of v0**: v0 clients (synchronous engine runs
 hosted by the console) are unaffected. v0.1 adds `mode: "ci-local"` — the
@@ -59,7 +63,7 @@ the same commit).
     run_in_progress` (a run stuck in-flight > 10 minutes counts as
     `INFRA_FAILED` and retries free).
   - `402` — `{ "error": "insufficient_balance", "balance": <int>,
-    "topup_url": "https://console.argus-lab.tech/billing" }`. A refused
+    "topup_url": "https://console.argus-lab.tech/#billing" }`. A refused
     attempt persists nothing. The action maps it to `action_required` with
     the top-up link.
   - `401` — unknown or revoked key → `action_required`.
@@ -100,11 +104,30 @@ the same commit).
 
 - Welcome: 3 free runs (CI + console share one balance — one key, one
   balance).
-- Single run: **$3** per core battery run.
-- Packages: **$29 / $49 / $79** — planned pricing; the detailed SKU table and
-  the SKU-to-ledger wiring ship with api-contract **v0.2**.
+- Unit of balance unchanged (v0 fixed decision): 1 credit = 1 battery run,
+  integers end-to-end; the ledger stores runs, not dollars.
+
+SKU table (v0.2 — all live: public pricing anchor `/#billing` on the landing
+and the in-dashboard Billing tab render the same cards):
+
+| SKU | Price | Credits | Expiry | Effective per run |
+| --- | --- | --- | --- | --- |
+| Single run (pay-as-you-go) | $3 | 1 | never expires | $3.00 |
+| Starter | $29 | 30 | 30 days | ≈$0.97 |
+| Top-up pack | $49 | 50 | never expires | $0.98 |
+| Standard | $79 | 90 | 30 days | ≈$0.88 |
+
+- Pay-as-you-go: the single-run SKU is the v0.1 promise kept literally — one
+  order of $3 (unique cent tail `$3.xx` for auto-matching) grants exactly one
+  core battery run, wired through the same ORDER → GRANT → CONSUME ledger
+  path as every other SKU.
+- Credits are integer run-credits regardless of the funding SKU; the per-run
+  dollar figure is the SKU's effective rate, not a ledger unit.
+- Top-up link: `https://console.argus-lab.tech/#billing` — the 402
+  `topup_url` points to the public landing anchor.
 - No silent charges: the first paid run surfaces price and balance; credits
-  do not expire; top-ups are crypto-paid and credited instantly.
+  do not expire unless the SKU says so (30-day plans); top-ups are
+  crypto-paid and credited instantly.
 
 ## Battery ids
 

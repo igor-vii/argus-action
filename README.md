@@ -167,7 +167,9 @@ marks a candidate, not a seal.
 ## Billing
 
 - 3 welcome runs free (CI + console share one balance — one key, one balance).
-- $3 per core battery run; $29 per 30-run package (credits do not expire).
+- $3 single-run SKU (pay-as-you-go, credit never expires); $29 / $49 / $79
+  packages grant 30 / 50 / 90 credits — the full SKU table lives in
+  [docs/api-contract.md](docs/api-contract.md) v0.2.
 - Idempotent debits: `idempotency_key = sha256("argus.idem.v1:" + commit + ":" + battery)`
   per api-contract-v0 — one commit + one battery = one charge per account,
   restarts are free; replays are scoped per-account.
