@@ -283,11 +283,17 @@ export async function runArgus(ports: Ports): Promise<Outcome> {
       payload,
       idempotencyKeyFor({ ...inputs, battery }),
     );
-    runId = registration.id;
-    runUrl = `${inputs.consoleUrl.replace(/\/$/, '')}${registration.url}`;
-    ports.log(`run registered: ${runUrl} (charged ${registration.charged_credits}, balance ${registration.balance})`);
-    ports.outputs.set('run-id', runId);
-    ports.outputs.set('run-url', runUrl);
+    runId = registration.id || undefined;
+    runUrl = registration.url ? `${inputs.consoleUrl.replace(/\/$/, '')}${registration.url}` : undefined;
+    const replayNote = registration.replayed
+      ? ' — idempotent replay, no re-debit (charge once, free retry)'
+      : '';
+    ports.log(
+      `run registered${registration.replayed ? ' (replay)' : ''}${runUrl ? `: ${runUrl}` : ''} ` +
+      `(charged ${registration.charged_credits}, balance ${registration.balance})${replayNote}`,
+    );
+    if (runId) ports.outputs.set('run-id', runId);
+    if (runUrl) ports.outputs.set('run-url', runUrl);
   } catch (err) {
     if (err instanceof BillingError) {
       // Contract semantics (result-contract-v0): the agent was not measured, so

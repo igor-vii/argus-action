@@ -6,14 +6,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { canonical } from '../src/lib/canonical';
 import { loadBundleKeys, verifySeal } from '../src/lib/seal';
 import { loadSutContract, EXAMPLE_SUT } from '../src/lib/sut-contract';
 import { gateResult } from '../src/lib/result-gate';
 import { checkRunName, conclusionFor, idempotencyKeyFor } from '../src/lib/render';
 import { COMMENT_MARKER, renderComment, renderSummary } from '../src/lib/summary';
-import { TIMEOUTS } from '../src/lib/console-client';
+import { TIMEOUTS, registerRun, type RunPayload } from '../src/lib/console-client';
 import { CONCLUSION_MAP, rollupOf, validateResult } from '../src/vendor/result-view.mjs';
 import { createHash } from 'node:crypto';
 
@@ -261,6 +261,58 @@ describe('P0-4 timeouts', () => {
     expect(TIMEOUTS.bundleDownloadMs).toBe(120_000);
     expect(TIMEOUTS.registerRunMs).toBe(30_000);
     expect(TIMEOUTS.githubApiMs).toBe(10_000);
+  });
+});
+
+describe('registerRun: idempotent replay (409)', () => {
+  const cfg = { baseUrl: 'https://console.test', apiKey: 'argci_test' };
+  const payload: RunPayload = {
+    mode: 'ci-local',
+    battery: 'x402-core',
+    engine_version: '2.1.1',
+    bundle: { key_id: 'bundle-2026q4', tree_sha256: 'a'.repeat(64) },
+    rollup: 'DOCUMENTED',
+    verdicts: [],
+    duration_ms: 1,
+    public: true,
+    repo: 'igor-vii/argus-ci-dogfood',
+    commit: 'a'.repeat(40),
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('409 + X-Argus-Replayed: 1 is a free replay — cached run identity, zero charge', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ schema: 'argus.result.v0', public: true, run: { id: 'r-42', url: '/runs/r-42' } }),
+      { status: 409, headers: { 'x-argus-replayed': '1', 'x-argus-balance': '137' } },
+    )));
+    const reg = await registerRun(cfg, payload, 'f'.repeat(64));
+    expect(reg.replayed).toBe(true);
+    expect(reg.charged_credits).toBe(0);
+    expect(reg.balance).toBe(137);
+    expect(reg.id).toBe('r-42');
+    expect(reg.url).toBe('/runs/r-42');
+    expect(reg.public).toBe(true);
+  });
+
+  it('409 without the replay header is a conflict (run in flight), not a replay', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ error: 'run_in_progress', run_id: 'r-7' }),
+      { status: 409 },
+    )));
+    await expect(registerRun(cfg, payload, 'f'.repeat(64)))
+      .rejects.toThrow(/conflict: run_in_progress \(run r-7\)/);
+  });
+
+  it('409 conflict without run_id keeps the plain message', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ error: 'run_in_progress' }),
+      { status: 409 },
+    )));
+    await expect(registerRun(cfg, payload, 'f'.repeat(64)))
+      .rejects.toThrow('conflict: run_in_progress');
   });
 });
 

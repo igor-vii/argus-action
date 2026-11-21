@@ -65,7 +65,7 @@ beforeAll(async () => {
     '--engine', path.join(root, 'closed-repo-ci', 'engine'),
     '--version', '2.1.0',
     '--key-id', 'bundle-test-1',
-    '--storage', storageDir,
+    '--out', path.join(storageDir, 'bundles', 'x402-core'),
     '--keys-file', path.join(labDir, 'keys', 'bundle-keys.json'),
     '--dev-keys-dir', path.join(root, 'closed-repo-ci', 'dev-keys'),
   ]);

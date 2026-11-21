@@ -149025,6 +149025,23 @@ async function registerRun(cfg, payload, idempotencyKey) {
   if (res.status === 402) {
     throw new BillingError(await res.json());
   }
+  if (res.status === 409) {
+    const body2 = await res.json().catch(() => ({}));
+    if (res.headers.get("x-argus-replayed") === "1") {
+      const run2 = body2.run ?? {};
+      return {
+        id: String(run2.id ?? ""),
+        url: String(run2.url ?? ""),
+        public: Boolean(body2.public),
+        charged_credits: 0,
+        balance: Number(res.headers.get("x-argus-balance") ?? "0"),
+        welcome_remaining: 0,
+        replayed: true
+      };
+    }
+    const inFlight = body2.run_id ? ` (run ${String(body2.run_id)})` : "";
+    throw new Error(`run registration conflict: ${String(body2.error ?? "HTTP 409")}${inFlight}`);
+  }
   if (res.status !== 201 && res.status !== 200) {
     throw new Error(`run registration failed: HTTP ${res.status}`);
   }
@@ -149589,11 +149606,14 @@ async function runArgus(ports) {
       payload,
       idempotencyKeyFor({ ...inputs, battery })
     );
-    runId = registration.id;
-    runUrl = `${inputs.consoleUrl.replace(/\/$/, "")}${registration.url}`;
-    ports.log(`run registered: ${runUrl} (charged ${registration.charged_credits}, balance ${registration.balance})`);
-    ports.outputs.set("run-id", runId);
-    ports.outputs.set("run-url", runUrl);
+    runId = registration.id || void 0;
+    runUrl = registration.url ? `${inputs.consoleUrl.replace(/\/$/, "")}${registration.url}` : void 0;
+    const replayNote = registration.replayed ? " \u2014 idempotent replay, no re-debit (charge once, free retry)" : "";
+    ports.log(
+      `run registered${registration.replayed ? " (replay)" : ""}${runUrl ? `: ${runUrl}` : ""} (charged ${registration.charged_credits}, balance ${registration.balance})${replayNote}`
+    );
+    if (runId) ports.outputs.set("run-id", runId);
+    if (runUrl) ports.outputs.set("run-url", runUrl);
   } catch (err) {
     if (err instanceof BillingError) {
       ports.log(`billing: ${String(err)}`);

@@ -38,6 +38,10 @@ export interface RunRegistration {
   balance: number;
   welcome_remaining: number;
   access_token?: string | null;
+  /** Console answered 409 + X-Argus-Replayed: 1 — the idempotency key was
+   *  already paid and COMPLETED; the cached result is authoritative and
+   *  nothing was re-debited (charge once, free retry). */
+  replayed?: boolean;
 }
 
 export async function fetchBundleMeta(cfg: ConsoleConfig, battery: string): Promise<BundleMeta> {
@@ -93,6 +97,28 @@ export async function registerRun(
   });
   if (res.status === 402) {
     throw new BillingError((await res.json()) as Record<string, unknown>);
+  }
+  if (res.status === 409) {
+    // Two documented 409s (api-contract v0): an idempotent replay of an
+    // already-COMPLETED run (body = the cached argus.result.v0 doc, headers
+    // X-Argus-Replayed: 1 + X-Argus-Balance) and a concurrent run still in
+    // flight (body { error: "run_in_progress", run_id }). Only the replay is
+    // a success path: charge once, free retry — the debit never doubles.
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.headers.get('x-argus-replayed') === '1') {
+      const run = (body.run ?? {}) as { id?: unknown; url?: unknown };
+      return {
+        id: String(run.id ?? ''),
+        url: String(run.url ?? ''),
+        public: Boolean(body.public),
+        charged_credits: 0,
+        balance: Number(res.headers.get('x-argus-balance') ?? '0'),
+        welcome_remaining: 0,
+        replayed: true,
+      };
+    }
+    const inFlight = body.run_id ? ` (run ${String(body.run_id)})` : '';
+    throw new Error(`run registration conflict: ${String(body.error ?? 'HTTP 409')}${inFlight}`);
   }
   if (res.status !== 201 && res.status !== 200) {
     throw new Error(`run registration failed: HTTP ${res.status}`);
