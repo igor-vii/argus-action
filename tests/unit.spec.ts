@@ -15,15 +15,33 @@ import { checkRunName, conclusionFor, idempotencyKeyFor } from '../src/lib/rende
 import { COMMENT_MARKER, renderComment, renderSummary } from '../src/lib/summary';
 import { TIMEOUTS } from '../src/lib/console-client';
 import { CONCLUSION_MAP, rollupOf, validateResult } from '../src/vendor/result-view.mjs';
-import { canonical as engineCanonical } from '../../closed-repo-ci/engine/protocol.mjs';
 import { createHash } from 'node:crypto';
+
+// Engine canonical-form parity lives in the closed repo, which is absent in
+// the public CI. The import is therefore dynamic (through a non-literal spec
+// so typecheck does not probe the closed path); when the repo is present the
+// parity test runs byte-for-byte, otherwise it skips.
+let engineCanonical: ((obj: unknown) => string) | null = null;
+try {
+  const engineProtocol = new URL('../../closed-repo-ci/engine/protocol.mjs', import.meta.url).pathname;
+  ({ canonical: engineCanonical } = await import(engineProtocol));
+} catch {
+  // closed repo not present in the public CI — parity test skips
+}
+const itParity = engineCanonical ? it : it.skip;
 
 const run = promisify(execFile);
 const root = new URL('../..', import.meta.url).pathname;
+// The CI packer (bundle build + tamper matrix) also lives in the closed repo.
+const closedRepoPresent = fs.existsSync(path.join(root, 'closed-repo-ci', 'ci', 'build-bundle.mjs'));
 
 let tmp: string;
 beforeAll(async () => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'argus-unit-'));
+  if (!closedRepoPresent) {
+    console.warn('closed repo absent (public CI): bundle-backed unit tests skip');
+    return;
+  }
   // Build a real sealed bundle via the CI packer against a stub engine.
   fs.mkdirSync(path.join(tmp, 'engine'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'engine', 'run.mjs'), 'console.log("stub engine");\n');
@@ -45,16 +63,18 @@ afterAll(() => {
 });
 
 describe('canonical form parity', () => {
-  it('action canonical matches engine canonical byte-for-byte', () => {
+  itParity('action canonical matches engine canonical byte-for-byte', () => {
     const obj = { b: 2, a: { d: [1, { z: null, y: true }], c: 'x' } };
-    expect(canonical(obj)).toBe(engineCanonical(obj));
+    expect(canonical(obj)).toBe(engineCanonical!(obj));
   });
   it('is stable under key insertion order', () => {
     expect(canonical({ b: 1, a: 2 })).toBe(canonical({ a: 2, b: 1 }));
   });
 });
 
-describe('seal verifier (P0-1 tamper matrix)', () => {
+const describeSeal = closedRepoPresent ? describe : describe.skip;
+
+describeSeal('seal verifier (P0-1 tamper matrix)', () => {
   const bundleDir = () => path.join(tmp, 'bundle');
   const keys = () => loadBundleKeys(path.join(tmp, 'keys.json'));
 
