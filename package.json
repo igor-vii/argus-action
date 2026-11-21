@@ -1,13 +1,14 @@
 {
   "name": "argus-action",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "private": true,
   "description": "Runs the real Argus engine (sealed bundle) against your SUT in CI.",
   "scripts": {
     "build": "node build.mjs",
     "test": "vitest run",
     "check:language": "node scripts/check-language.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json"
   },
   "dependencies": {
     "@actions/artifact": "^2.3.2",
