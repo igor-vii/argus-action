@@ -13,6 +13,7 @@
 //   I  client role, naive buyer  — pays poisoned offers -> FAIL -> failure
 //   J  payment.rail "base-sepolia" — rejected before any session (deferred to v2.1)
 import { execFile, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -170,9 +171,11 @@ function portsFor(repo: string, apiKey: string, extra: Record<string, unknown> =
       consoleUrl,
       consoleApiKey: apiKey,
       bundleKeysPath,
-      // unique repo/commit per fixture keeps idempotency keys isolated between scenarios
+      // idempotency-key = sha256(argus.idem.v1:commit:battery) — one commit +
+      // one battery is one paid run, scoped per account console-side. A unique
+      // commit per fixture keeps scenario idempotency keys isolated.
       repo: `acme/${path.basename(repo)}`,
-      commit: 'f'.repeat(40),
+      commit: createHash('sha256').update(repo).digest('hex').slice(0, 40),
       ...extra,
     },
   });
