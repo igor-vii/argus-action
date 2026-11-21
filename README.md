@@ -46,13 +46,45 @@ payment is always `FAIL`.
 
 ## Usage
 
+Minimal workflow (drop this into `.github/workflows/argus.yml` — the only
+prerequisite is the `argus.sut.json` contract in your repo root):
+
 ```yaml
-- uses: argus-lab/argus-action@v2
+name: Argus battery
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  argus:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: igor-vii/argus-action@v2
+        with:
+          console-url: https://console.argus-lab.tech
+          console-api-key: ${{ secrets.ARGUS_API_KEY }}
+          public-run: true        # publish the run report page
+          comment: false          # opt-in PR comment
+```
+
+One-time setup: issue an api-key in the console (Settings → API keys) and
+store it as the `ARGUS_API_KEY` Actions secret. Every run is billed
+idempotently — see [Billing](#billing).
+
+Pin a specific release instead of the floating major if you want freeze:
+`igor-vii/argus-action@v2.1.3`.
+
+```yaml
+- uses: igor-vii/argus-action@v2.1.3
   with:
-    console-url: https://argus-lab.tech
+    console-url: https://console.argus-lab.tech
     console-api-key: ${{ secrets.ARGUS_API_KEY }}
-    public-run: true        # publish the run report page
-    comment: false          # opt-in PR comment
 ```
 
 ### Inputs
@@ -151,14 +183,17 @@ and other GitHub calls 10 s.
 
 ```bash
 npm ci
-npm run build          # esbuild -> dist/index.js (committed)
-npm run typecheck
-npm test               # unit (24) + e2e (12 scenarios A–J)
-npm run check:language # zero mentions of the retired mode in live paths
+npm run build           # esbuild -> dist/index.js (committed; CI guards it is fresh)
+npm run typecheck       # src only (works in the public CI)
+npm run typecheck:tests # src + tests — needs the closed sibling repo
+npx vitest run tests/unit.spec.ts   # public unit suite (bundle tests skip without the closed repo)
+npm test                # unit (25) + e2e (12 scenarios A–J) — needs the closed sibling repo
+npm run check:language  # zero mentions of the retired mode in live paths
 ```
 
 The e2e suite boots the mock console, builds a genuinely sealed bundle via the
 CI packer (Ed25519), generates the tamper matrix and runs the orchestrator
 against the lab demo SUT (seller role) and demo buyer (client role).
 
-Contract reference: `docs/result-contract-v0.md` in the lab repo.
+Contract reference: `docs/api-contract.md` in this repo (canonical, live)
+and `docs/ci/result-contract-v0.md` in the lab repo.
