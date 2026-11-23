@@ -1,6 +1,6 @@
 # Argus Action
 
-[![GitHub Marketplace — Argus battery](https://img.shields.io/badge/Install-GitHub%20Marketplace-blue)](https://github.com/marketplace/actions/argus-battery) [![CI](https://github.com/igor-vii/argus-action/actions/workflows/ci.yml/badge.svg)](https://github.com/igor-vii/argus-action/actions/workflows/ci.yml) [![Verify the proof registry](https://img.shields.io/badge/Proof_registry-verify_in_one_command-green)](https://github.com/igor-vii/Argus-Agent-Test-Lab)
+[![GitHub Marketplace — Argus battery](https://img.shields.io/badge/Install-GitHub%20Marketplace-blue)](https://github.com/marketplace/actions/argus-battery) [![CI](https://github.com/igor-vii/argus-action/actions/workflows/ci.yml/badge.svg)](https://github.com/igor-vii/argus-action/actions/workflows/ci.yml) [![Verify the proof registry](https://img.shields.io/badge/Proof_registry-verify_in_one_command-green)](https://github.com/igor-vii/Argus-Agent-Test-Lab) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/igor-vii/argus-action/badge)](https://scorecard.dev/viewer/?uri=github.com/igor-vii/argus-action)
 
 Runs the **real Argus engine** (delivered as a sealed, signed bundle) against
 your SUT in CI: **real protocol sessions, real refusal points**. No mocks, no
