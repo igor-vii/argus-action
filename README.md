@@ -201,3 +201,9 @@ against the lab demo SUT (seller role) and demo buyer (client role).
 
 Contract reference: `docs/api-contract.md` in this repo (canonical, live)
 and `docs/ci/result-contract-v0.md` in the lab repo.
+
+## Feedback and contributions
+
+Bugs and feature requests: [GitHub Issues](https://github.com/igor-vii/argus-action/issues).
+Security-sensitive reports: see [SECURITY.md](SECURITY.md) (private vulnerability reporting).
+Contributions are accepted via pull requests — the process and requirements are described in [CONTRIBUTING.md](CONTRIBUTING.md).
